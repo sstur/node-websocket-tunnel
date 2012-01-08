@@ -1,81 +1,75 @@
 var https = require('https');
 var tunnel = require('./lib/tunnel');
-var readline = require('readline');
-var EventEmitter = require('events').EventEmitter;
 
 var remoteHost = process.argv[2] || 'localhost';
-var credentials, listen = {port: '', host: ''}, forward = {port: '3389', host: ''};
-var tunnels = [];
+var credentials, tunnels = [];
 
-var prompt = readline.createInterface(process.stdin, process.stdout);
+var shell = global.shell = require('./lib/shell');
 
-var shell = new EventEmitter();
 shell.on('command', function(cmd, args) {
-  console.log(Array.prototype.slice.call(arguments));
   if (cmd == 'help') {
-    console.log('Syntax:');
-    console.log('tunnel [localhost:]port [remotehost:]port');
-    console.log('close [tunnel-id]');
-    resumeConsole();
+    shell.echo('Commands:');
+    shell.echo('tunnel [localhost:]port [remotehost:]port');
+    shell.echo('close [tunnel-id]');
+    shell.echo('exit');
+    shell.prompt();
   } else
   if (cmd == 'tunnel') {
     tunnel.createTunnel(remoteHost, credentials, args[0], args[1], function(err, server) {
       if (err) {
-        console.log('Error: ' + err);
+        shell.echo('Error: ' + err);
       } else {
         var id = tunnels.push(server);
-        console.log('Tunnel created with id: ' + id);
+        shell.echo('Tunnel created with id: ' + id);
       }
-      resumeConsole();
+      shell.prompt();
     });
   } else
   if (cmd == 'close') {
-    var id = parseInt(args[0], 10);
+    var id = parseInt(args[0], 10) - 1;
     if (tunnels[id]) {
       tunnels[id].close();
       tunnels[id] = null;
-      console.log('Tunnel ' + id + ' closed.');
+      shell.echo('Tunnel ' + (id + 1) + ' closed.');
     } else {
-      console.log('Invalid tunnel id.');
+      shell.echo('Invalid tunnel id.');
     }
-    resumeConsole();
+    shell.prompt();
   } else
   if (cmd == 'exit') {
-    exit();
+    shell.exit();
   } else {
-    console.log('Invalid command. Type `help` for more information.');
-    resumeConsole();
+    shell.echo('Invalid command. Type `help` for more information.');
+    shell.prompt();
   }
 });
 
-console.log('WebSocket Tunnel Console v0.1');
-console.log('Remote Host: https://' + remoteHost);
+shell.echo('WebSocket Tunnel Console v0.1');
+shell.echo('Remote Host: https://' + remoteHost);
 
-prompt.question('Username: ', function(user) {
-  prompt.question('Password: ', function(pw) {
-    credentials = user + ':' + pw;
-    console.log('Authenticating  `' + credentials + '` ...');
-    authenticate(function(success) {
-      if (success) {
-        resumeConsole();
-      } else {
-        console.log('Error: invalid credentials');
-        exit();
-      }
-    });
-  });
+authenticate(function() {
+  shell.prompt();
 });
 
-function resumeConsole() {
-  process.stdin.resume();
-  prompt.question('> ', function(command) {
-    process.stdin.pause();
-    var parts = command.split(/\s+/);
-    shell.emit('command', parts[0], parts.slice(1));
+function authenticate(callback) {
+  shell.prompt('Username: ', function(user) {
+    shell.prompt('Password: ', function(pw) {
+      credentials = user + ':' + pw;
+      shell.echo('Authenticating ...');
+      checkAuth(function(success) {
+        if (success) {
+          shell.echo('Authenticated Successfully.');
+          callback();
+        } else {
+          shell.echo('Error: invalid credentials.');
+          authenticate(callback);
+        }
+      });
+    }, {passwordMode: true});
   });
 }
 
-function authenticate(callback) {
+function checkAuth(callback) {
   var encoded = new Buffer(String(credentials)).toString('base64');
   var opts = {
     host: remoteHost,
@@ -86,14 +80,8 @@ function authenticate(callback) {
     callback(res.statusCode == 204);
   });
   req.on('error', function(err) {
-    console.log('Error Authenticating: ' + err);
+    shell.echo('Error Authenticating: ' + err);
     callback(false);
   });
   req.end();
-}
-
-function exit() {
-  prompt.close();
-  process.stdin.destroy();
-  process.exit();
 }
