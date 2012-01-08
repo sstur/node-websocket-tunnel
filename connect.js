@@ -17,7 +17,7 @@ shell.on('command', function(cmd, args) {
   if (cmd == 'tunnel') {
     tunnel.createTunnel(remoteHost, credentials, args[0], args[1], function(err, server) {
       if (err) {
-        shell.echo('Error: ' + err);
+        shell.echo(String(err));
       } else {
         var id = tunnels.push(server);
         shell.echo('Tunnel created with id: ' + id);
@@ -80,8 +80,9 @@ function checkAuth(callback) {
     callback(res.statusCode == 204);
   });
   req.on('error', function(err) {
-    shell.echo('Error Authenticating: ' + err);
-    callback(false);
+    shell.echo('Unable to authenticate.');
+    shell.echo(String(err));
+    shell.exit();
   });
   req.end();
 }

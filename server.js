@@ -29,7 +29,9 @@ server.on('request', function(req, res) {
   }
 });
 
-server.listen(443, '192.168.67.11', function() {
+var addr = parseAddr(process.argv[2], {port: 443, host: '0.0.0.0'});
+
+server.listen(addr.port, addr.host, function() {
   var addr = server.address();
   console.log('listening on ' + addr.address + ':' + addr.port);
 });
@@ -91,9 +93,9 @@ function createTunnel(request, port, host) {
   tcpSock.connect(port, host || '127.0.0.1', function() {
     webSock.on('message', function(msg) {
       if (msg.type === 'utf8') {
-        console.log('received utf message: ' + msg.utf8Data);
+        //console.log('received utf message: ' + msg.utf8Data);
       } else {
-        console.log('received binary message of length ' + msg.binaryData.length);
+        //console.log('received binary message of length ' + msg.binaryData.length);
         tcpSock.write(msg.binaryData);
       }
     });
@@ -122,4 +124,21 @@ function md5(s) {
   var hash = crypto.createHash('md5');
   hash.update(new Buffer(String(s)));
   return hash.digest('hex');
+}
+
+function parseAddr(str, addr) {
+  if (str) {
+    var parts = str.split(':');
+    if (parts.length == 1) {
+      if (parts[0] == parseInt(parts[0], 10).toString()) {
+        addr.port = parts[0];
+      } else {
+        addr.host = parts[0];
+      }
+    } else
+    if (parts.length == 2) {
+      addr = {host: parts[0], port: parts[1]};
+    }
+  }
+  return addr;
 }
