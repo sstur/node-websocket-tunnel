@@ -5,8 +5,37 @@ var crypto = require('crypto');
 var urlParse = require('url').parse;
 var WebSocketServer = require('websocket').server;
 
-var key = fs.readFileSync('keys/ssl.key', 'utf8');
-var cert = fs.readFileSync('keys/ssl.crt', 'utf8');
+process.chdir(__dirname);
+
+var argv = require('optimist').argv;
+var pidfile;
+
+//kill an already running instance
+if (argv.kill) {
+  pidfile = argv.kill;
+  if (!pidfile.match(/\.pid$/i))
+    pidfile += '.pid';
+  try {
+    var pid = fs.readFileSync(pidfile, 'utf8');
+    fs.unlinkSync(pidfile);
+    process.kill(parseInt(pid, 10));
+    console.log('Killed process ' + pid);
+  } catch(e) {
+    console.log('Error killing process ' + (pid || argv.kill));
+  }
+  process.exit();
+}
+
+//write pid to file so it can be killed with --kill
+if (argv.pidfile) {
+  pidfile = argv.pidfile;
+  if (!pidfile.match(/\.pid$/i))
+    pidfile += '.pid';
+  fs.writeFileSync(pidfile, process.pid);
+}
+
+var key = fs.readFileSync('./keys/ssl.key', 'utf8');
+var cert = fs.readFileSync('./keys/ssl.crt', 'utf8');
 var users = loadUsers();
 
 var server = https.createServer({key: key, cert: cert});
@@ -29,7 +58,7 @@ server.on('request', function(req, res) {
   }
 });
 
-var addr = parseAddr(process.argv[2], {port: 443, host: '0.0.0.0'});
+var addr = parseAddr(argv._[0] || '', {port: 443, host: '0.0.0.0'});
 
 server.listen(addr.port, addr.host, function() {
   var addr = server.address();
@@ -109,7 +138,7 @@ function createTunnel(request, port, host) {
 }
 
 function loadUsers() {
-  var lines = fs.readFileSync('users.txt', 'utf8');
+  var lines = fs.readFileSync('./users.txt', 'utf8');
   var users = {};
   lines.split(/[\r\n]+/g).forEach(function(line) {
     var parts = line.split(':');
